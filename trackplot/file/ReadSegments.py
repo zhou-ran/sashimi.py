@@ -382,7 +382,9 @@ class ReadSegment(File):
                     current_ignore_num = min(
                         [self.deletion_ignore, read.query_alignment_length * self.del_ratio_ignore])
                 else:
-                    current_ignore_num = np.Inf
+                    current_ignore_num = np.inf
+                    # AD - AttributeError: `np.Inf` was removed in the NumPy 2.0 release. Use `np.inf` instead.
+
 
                 exon_bound = []
                 intron_bound = []
