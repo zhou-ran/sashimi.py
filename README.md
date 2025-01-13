@@ -27,28 +27,28 @@ The modifications in this repo generate a specific visualization of a specific t
 
 The example follows the "intron shrinkage" example from the real Trackplot (to find the link, visit [ygidtu/trackplot](https://github.com/ygidtu/trackplot) and click on "readthedocs"). There are two BAM files. Here is the output with introns fixed at 250 nt, exons unharmed (1:1), without any filtering of low-count junctions:
 
-<table><tr><td></td><td width="95%"><img src=docs/PTBP3_mod_specific_transcipts.png></td><td></td></tr></table>
+![](docs/PTBP3_mod_specific_transcipts.png)
 
 With --log 10 to see all the low-count junctions:
 
-<table><tr><td></td><td width="95%"><img src=docs/PTBP3_mod_specific_transcipts_log10_edit.png></td><td></td></tr></table>
+![](docs/PTBP3_mod_specific_transcipts_log10_edit.png)
 
 If we use Trackplot's scaling features, we can get reasonably close (exons=20, introns=0.10):
 
-<table><tr><td></td><td width="95%"><img src=docs/PTBP3_mod_specific_transcipts_introns_and_exons_scaled.png></td><td></td></tr></table>
+![](docs/PTBP3_mod_specific_transcipts_introns_and_exons_scaled.png)
 
 Here is the equivalent plot with Trackplot (note the gaps remaining from excluded transcripts):
 
-<table><tr><td></td><td width="95%"><img src=docs/PTBP3_trackplot_specific_trans_all_junctions.exons.20.introns.0.10.png></td><td></td></tr></table>
+![](docs/PTBP3_trackplot_specific_trans_all_junctions.exons.20.introns.0.10.png)
 
 With --density-by-strand:
 
-<table><tr><td></td><td width="95%"><img src=docs/PTBP3_trackplot_all_junctions_specific_transcripts_by_strand_edit.png></td><td></td></tr></table>
+![](docs/PTBP3_trackplot_all_junctions_specific_transcripts_by_strand_edit.png)
 
 
 To be clear, the modifications described here were a small step following a giant leap forward. For instance, here is how the data looks in IGV:
 
-<table><tr><td></td><td width="95%"><img src=docs/ptbp3_igv_2.png></td><td></td></tr></table>
+![](docs/ptbp3_igv_2.png)
 
 ## Commands
 
