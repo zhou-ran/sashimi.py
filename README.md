@@ -15,7 +15,9 @@ This code is not intended to replace Trackplot. Installation etc. are untested. 
 The modifications in this repo generate a specific visualization of a specific type of data, one that's surprisingly missing: a quantitative representation of splice junctions from RNA-seq on a scale as similar as possible to the coverage/depth in exons, and with introns compressed consistently. (Why does this matter? Manuscript in preparation.) Trackplot comes impressively close:
 1. It can already rescale introns, so the horizontal real estate is not captive to the length of mammalian introns. Trackplot compresses all introns using the same factor (e.g. 25%), so long introns persist, but this is compensated by the option to rescaled exons separately (e.g. 10X).
 2. It already draws splice-junctions as arcs, and it can display junction counts right next to those arcs. (In passing, the placement of this number was essential to the demise of the Bezier curve.)
-3. It's written in Python, and the code is well-structured. (Yes, I tried other options.)
+3. It's written in Python, and the code is well-structured. (Yes, I tried other options, like [JBrowse2](https://jbrowse.org/jb2/) and [SpliceGrapher](https://splicegrapher.sourceforge.net/). No can do. Yes, I've seen [splicejam](https://jmw86069.github.io/splicejam/).)
+
+
 
 ## Modifications from Trackplot
 
@@ -23,13 +25,13 @@ The modifications in this repo generate a specific visualization of a specific t
 - Introns can be shown as if they all have a fixed length, e.g. 250 bp. This is akin to how Trackplot scales exons, with every base of a given type occupying the same space. Because it wasn't trivial to modify the parameters to handle this correctly, this feature is overloaded on the intron-scale option: if it's > 1, it's interpreted as the target genomic length of every intron. (plot_func::init_graph_coords).
 - When `--transcripts-to-show` is specified, unwanted transcripts are dropped immediately upon reading from the GTF file. Otherwise, their coordinates linger in the alignments and take up precious space (in file/Annotation.py).
 
-## Example (in progress)
+## Example
 
 The example follows the "intron shrinkage" example from the real Trackplot (to find the link, visit [ygidtu/trackplot](https://github.com/ygidtu/trackplot) and click on "readthedocs"). There are two BAM files. Here is the output with introns fixed at 250 nt, exons unharmed (1:1), without any filtering of low-count junctions:
 
 ![](docs/PTBP3_mod_specific_transcipts.png)
 
-With --log 10 to see all the low-count junctions:
+With --log 10, we can see all the low-count junctions:
 
 ![](docs/PTBP3_mod_specific_transcipts_log10_edit.png)
 
