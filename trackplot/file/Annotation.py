@@ -2,8 +2,10 @@
 # -*- coding:utf-8 -*-
 u"""
 Created by ygidtu@gmail.com at 2020.05.07
-
 This scripts contains the class handle the reference file
+
+Modified by AD 2025/01/12 to include only specified transcripts, otherwise their exon coordinates still occupy the alignments.
+
 """
 import glob
 import gzip
@@ -349,16 +351,15 @@ class Annotation(File):
 
         return output_gtf
 
-    def __load_gtf__(self):
-
+    def __load_gtf__(self, transcripts_to_show: list[str]|None = None):
         u"""
         Load transcripts inside of region from gtf file
         :param region: target region
         :return: list of Transcript
-        """
+        """ 
+        # AD - passing transcripts_to_show
         transcripts = {}
         exons = {}
-
         for rec in Reader.read_gtf(self.path, self.region):
             start = max(rec.start, self.region.start)
             end = min(rec.end, self.region.end)
@@ -369,6 +370,13 @@ class Annotation(File):
                 break
 
             if re.search(r"(rna|transcript|cds)", rec.feature, re.I):
+
+                if transcripts_to_show:
+                    _name = rec.transcript_name if "transcript_name" in rec.attributes else rec.transcript_id
+                    if _name not in transcripts_to_show:
+                        logger.info(f"Skipping transcript {_name}")
+                        continue
+
                 if rec.transcript_id not in transcripts.keys():
                     transcripts[rec.transcript_id] = Transcript(
                         chromosome=rec.contig,
@@ -380,7 +388,8 @@ class Annotation(File):
                         gene=rec.gene_name if "gene_name" in rec.attributes else "",
                         transcript=rec.transcript_name if "transcript_name" in rec.attributes else "",
                         exons=[]
-                    )
+                 )
+
             elif re.search(r"(exon)", rec.feature, re.I):
                 if rec.transcript_id not in exons.keys():
                     exons[rec.transcript_id] = []
@@ -581,9 +590,16 @@ class Annotation(File):
         assert isinstance(region, GenomicLoci), "region should be a GenomicLoci object"
         if transcripts is None:
             transcripts = []
+        elif isinstance(transcripts, str):
+            # AD when no transcripts are specified, transcripts is an empty string, not None
+            if transcripts == "":
+                transcripts = []
+            else:
+                transcripts = transcripts.split(",")
         self.region = region
+        # AD - pass specified transcripts early
         if self.category == "gtf":
-            self.__load_gtf__()
+            self.__load_gtf__(transcripts)
             if self.add_local_domain:
                 self.__load_local_domain__(region)
 
