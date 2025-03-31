@@ -2,11 +2,13 @@
 # -*- coding:utf-8 -*-
 u"""
 This script contains the functions to draw different images
+Modified by AD 2025/01/13
 """
-import gzip
+import itertools # AD - for cumulative sum of graph_coords
+#import gzip
 import math
 from copy import deepcopy
-from decimal import Decimal
+#from decimal import Decimal
 from typing import Dict, List, Optional, Union, Tuple, Set
 
 import matplotlib as mpl
@@ -25,6 +27,7 @@ from matplotlib.textpath import TextPath
 from matplotlib.transforms import Affine2D
 from scipy.cluster.hierarchy import dendrogram, linkage
 from scipy.stats import gaussian_kde, zscore
+from scipy.stats import beta # AD
 
 from trackplot.anno.theme import Theme
 from trackplot.base.GenomicLoci import GenomicLoci
@@ -100,7 +103,6 @@ def cubic_bezier(pts, t):
     p3 = np.array(p3)
     return p0 * (1 - t) ** 3 + 3 * t * p1 * (1 - t) ** 2 + 3 * t ** 2 * (1 - t) * p2 + t ** 3 * p3
 
-
 def __merge_exons__(exons: List[List[int]]):
     u"""
     merge the overlap exons into one
@@ -124,7 +126,7 @@ def __merge_exons__(exons: List[List[int]]):
 
 
 def init_graph_coords(region: GenomicLoci, exons: Optional[List[List[int]]] = None, exon_scale=1,
-                      intron_scale=.5) -> np.array:
+                      intron_scale=0.5) -> np.array:
     u"""
     init the default
     :param region: the plot region
@@ -135,33 +137,62 @@ def init_graph_coords(region: GenomicLoci, exons: Optional[List[List[int]]] = No
     graph_coords = np.zeros(len(region), dtype=int)
 
     if exons:
-        # if there have exons, init graph_coords by exon and intron scales
-        for i in range(0, exons[0][0] - region.start):
-            graph_coords[i] = (i - 0) * intron_scale
+        # AD - if user specifies an intron scale in line with Trackplot, addition is transparent
+        if intron_scale <= 1:
+            # if there have exons, init graph_coords by exon and intron scales
+            for i in range(0, exons[0][0] - region.start):
+                graph_coords[i] = (i - 0) * intron_scale
+            exons = __merge_exons__(exons)
+            for i in range(0, len(exons)):
+                exon = exons[i]
+                if i > 0:
+                    intron = [exons[i - 1][1], exons[i][0]]
 
-        exons = __merge_exons__(exons)
-        for i in range(0, len(exons)):
-            exon = exons[i]
-
-            if i > 0:
-                intron = [exons[i - 1][1], exons[i][0]]
-
-                for j in range(intron[0], intron[1]):
+                    for j in range(intron[0], intron[1]):
+                        if j >= region.start:
+                            graph_coords[j - region.start] = graph_coords[intron[0] - region.start - 1] + (
+                                    j - intron[0] + 1) * intron_scale
+                for j in range(exon[0], exon[1] + 1):
                     if j >= region.start:
-                        graph_coords[j - region.start] = graph_coords[intron[0] - region.start - 1] + (
-                                j - intron[0] + 1) * intron_scale
+                        graph_coords[j - region.start] = graph_coords[exon[0] - region.start - 1] + (
+                                j - exon[0] + 1) * exon_scale
+            intron = [exons[-1][-1], region.end]
+            for i in range(intron[0], intron[1]):
+                if i >= region.start:
+                    graph_coords[i - region.start] = graph_coords[intron[0] - region.start - 1] + (
+                            i - intron[0] + 1) * intron_scale
+        else:
+            exons = __merge_exons__(exons)
+            while exons[0][1] < region.start:
+                exons = exons[1:]
+            while exons[-1][0] > region.end:
+                exons = exons[:-1]
+            exons[0][0] = max(exons[0][0], region.start)
+            exons[-1][1] = min(exons[-1][1], region.end)
+            last_interval = region.end - exons[-1][1]
+            for i, e in enumerate(exons):
+                exons[i][0] -= region.start
+                exons[i][1] -= region.start
 
-            for j in range(exon[0], exon[1] + 1):
-                if j >= region.start:
-                    graph_coords[j - region.start] = graph_coords[exon[0] - region.start - 1] + (
-                            j - exon[0] + 1) * exon_scale
-
-        intron = [exons[-1][-1], region.end]
-        for i in range(intron[0], intron[1]):
-            if i >= region.start:
-                graph_coords[i - region.start] = graph_coords[intron[0] - region.start - 1] + (
-                        i - intron[0] + 1) * intron_scale
-
+            steps = [float(exon_scale)] * len(region)
+            if exons[0][0] > 0:
+                step = intron_scale / exons[0][0]
+                for i in range(exons[0][0]):
+                    steps[i] = step
+            for e in range(1, len(exons)):
+                interval = exons[e][0] - exons[e-1][1] - 2
+                step = intron_scale / interval
+                for i in range(exons[e-1][1], exons[e][0]):
+                    steps[i] = step
+                interval = exons[e][0] - exons[e-1][1] - 2
+            if last_interval := len(region) - exons[-1][1] - 1:
+                step = intron_scale / last_interval
+                for i in range(exons[1][1] +1, len(region)):
+                    steps[i] = step
+            graph_coords = list(map(int, itertools.accumulate(steps)))
+            #increments match exactly with original code
+            #for i, e in enumerate(graph_objects):
+            #    print(f"{i}\t{e}")
     else:
         # if there is not any exons, just init graph_coords by region
         for i, j in enumerate(range(region.start, region.end + 1)):
@@ -174,7 +205,6 @@ def init_graph_coords(region: GenomicLoci, exons: Optional[List[List[int]]] = No
             if i > current_max:
                 graph_coords[i] = max(graph_coords) + 1
     return graph_coords
-
 
 def set_x_ticks(
         ax: mpl.axes.Axes,
@@ -284,6 +314,8 @@ def set_y_ticks(
         universal_y_ticks = sorted(universal_y_ticks)
 
         for lab in universal_y_ticks:
+            curr_y_tick_labels.append(f"{int(lab)}")
+            """
             if y_axis_skip_zero and lab == 0:
                 # Exclude label for 0
                 curr_y_tick_labels.append("")
@@ -291,6 +323,7 @@ def set_y_ticks(
                 curr_y_tick_labels.append(f"{Decimal(lab):.2E}")
             else:
                 curr_y_tick_labels.append(f"{lab:.1f}" if lab % 1 != 0 else f"{int(lab)}")
+            """
         u"""
         @2019.01.04
         If there is no bam file, draw a blank y-axis 
@@ -306,6 +339,7 @@ def set_y_ticks(
     """
 
     if show_y_label:
+        
         def __dynamic_distance__(distance_between_label_axis: float, label: str, scale: int = 100) -> float:
             if distance_between_label_axis != 0:
                 return -distance_between_label_axis
@@ -314,9 +348,7 @@ def set_y_ticks(
 
         curr_y_tick_labels = sorted(curr_y_tick_labels, key=lambda x: len(x), reverse=True)
         ax.text(
-            x=__dynamic_distance__(
-                distance_between_label_axis, curr_y_tick_labels[0] if curr_y_tick_labels else ""
-            ) * max(graph_coords),
+            x=__dynamic_distance__(distance_between_label_axis, curr_y_tick_labels[0] if curr_y_tick_labels else "") * max(graph_coords),
             y=(max_used_y_val + min_used_y_val) / 2,
             s=label, fontsize=font_size, ha="right"
         )
@@ -629,7 +661,7 @@ def plot_density(
         color="blue",
         font_size: int = 8,
         show_junction_number: bool = True,
-        junction_number_font_size: int = 5,
+        junction_number_font_size: int = 12,
         n_y_ticks: int = 4,
         distance_between_label_axis: float = .1,
         show_y_label: bool = True,
@@ -664,6 +696,8 @@ def plot_density(
     :param kwargs:
     :return:
     """
+    # max_used_y_val is None
+    # distance_between_label_axis: 0
     if obj:
         assert obj.region is not None, "please load data first"
         region = obj.region
@@ -684,7 +718,17 @@ def plot_density(
     except AttributeError:
         # depth do not have junctions
         jxns = {}
+    
+    # AD - convert junction counts to log scale early if requested
+    if obj.log_trans and obj.log_trans.isdigit() and int(obj.log_trans) > 0: # in ["2", "10"]:
 
+        y_label += f" (log{obj.log_trans})"
+        denominator = np.log(int(obj.log_trans))
+        for k, v in jxns.items():
+            jxns[k] = np.log1p(v)  / denominator
+
+    min_used_y_val = 0 # AD
+    fixed_min_used_y = True #  AD
     fixed_max_used_y, fixed_min_used_y = max_used_y_val is not None, min_used_y_val is not None
     if max_used_y_val is None:
         if isinstance(data, dict):
@@ -720,7 +764,6 @@ def plot_density(
         if data.strand_aware:
             max_used_y_val = max(abs(min_used_y_val), max_used_y_val)
             min_used_y_val = -max(abs(min_used_y_val), max_used_y_val) if data.minus is not None else 0
-
     if jxns:
         # sort the junctions by intron length for better plotting look
         jxns_sorted_list = sorted(jxns.keys(), key=lambda x: (x.end - x.start, x.start, x.end), reverse=True)
@@ -732,10 +775,11 @@ def plot_density(
             min_junction_count = min(jxns.values())
         junction_count_gap = max_junction_count - min_junction_count
 
-        recorded_pts = set()
+        #recorded_pts = set()
         jxn_numbers = []
+
         for jxn_idx, jxn in enumerate(jxns_sorted_list):
-            logger.debug(f"junctions of {y_label}: {jxn} - {round(jxns[jxn], 2)}")
+            #logger.info(f"junctions of {y_label}: {jxn} - {round(jxns[jxn], 2)}")
             leftss, rightss = jxn.start, jxn.end
 
             # junction must at least have one anchor located in plotted region
@@ -748,20 +792,26 @@ def plot_density(
             # the junction out of boundaries, set the boundaries as coordinate
             ss1_idx, ss1_modified = get_limited_index(leftss - region.start, len(graph_coords))
             ss2_idx, ss2_modified = get_limited_index(rightss - region.start, len(graph_coords))
+            #logger.info(f"{y_label} ss1_idx {ss1_idx} ss1_modified {ss1_modified} ss2_idx {ss2_idx} ss2_modified {ss2_modified}")
             u"""
             @2019.01.14
             add two new variables to make it clear which one is index, which one is genomic site 
             """
             ss1, ss2 = graph_coords[ss1_idx], graph_coords[ss2_idx]
-
+            # AD = keep junction arcs on top
+            #min_used_y_val = 1
+            jxn_on_top = True
+            min_used_y_val = 0
             # draw junction on bottom
+            """
             if kwargs.get("density_by_strand"):
                 jxn_on_top = jxn.strand == "+"
             else:
                 jxn_on_top = jxn_idx % 2 == 0
+                #jxn_on_top = True # AD - keep all junctions on same strand
                 if abs(min_used_y_val) < max_used_y_val:
                     min_used_y_val = -max_used_y_val
-
+            """
             if fill_step == "post":
                 ss1_idx = max(0, ss1_idx - 1)
             elif fill_step == "pre":
@@ -785,46 +835,57 @@ def plot_density(
                     -right_dens - current_height,
                     -right_dens if not ss2_modified else -right_dens - current_height
                 ]
-
+            """
             if sum(pts) > 0:
                 pts_ = "_".join([str(x) for x in pts])
                 while pts_ in recorded_pts:
                     pts[1], pts[2] = pts[1] * 1.1, pts[2] * 1.1
                     pts_ = "_".join([str(x) for x in pts])
                 recorded_pts.add(pts_)
-
+            """
             """
             @2018.12.26
             scale the junctions line width
             """
             if junction_count_gap > 0:
-                line_width = (jxns[jxn] - min_junction_count) / junction_count_gap
+                #line_width = (jxns[jxn] - min_junction_count) / junction_count_gap
+                line_width = .5 + 1.5 * (jxns[jxn] - min_junction_count) / junction_count_gap
             else:
                 line_width = 0
+            #line_width = max(.5,np.log())
+            #pts = [(ss1, pts[0]), (ss1, pts[1]), (ss2, pts[2]), (ss2, pts[3])]
+            
 
-            pts = [(ss1, pts[0]), (ss1, pts[1]), (ss2, pts[2]), (ss2, pts[3])]
+            temp = np.linspace(0, 1.0, 100)
+            bdist = beta.pdf(temp, 3, 3)  # or  2, 2
+            bdist /= np.max(bdist) # max = 1
+            bdist *= jxns[jxn]
+            pts_x = np.linspace(ss1, ss2, 100)
+            
+            #pts = [(ss1, 0), (ss1+5, jxns[jxn]), (ss2-5, jxns[jxn]), (ss2, 0)]
+            path = Path(np.array([pts_x, bdist]).T)
+            patch = PathPatch(path, facecolor='none', edgecolor="#BA55D3", linewidth=line_width)
+            ax.add_patch(patch)
+            """
+            # pts = [(ss1, 0), (midpt-5, jxns[jxn]), (midpt+5, jxns[jxn]), (ss2, 0)]
             ax.add_patch(PathPatch(Path(pts, [Path.MOVETO, Path.CURVE4, Path.CURVE4, Path.CURVE4]),
-                                   ec=color, lw=line_width + 0.2, fc='none'))
-
+                                   ec="#BA55D3", lw=line_width, fc='none'))
+                                   #ec=color, lw=line_width + 0.2, fc='none'))
+            """
             if show_junction_number:
-                midpt = cubic_bezier(pts, .5)
-
-                t = ax.text(
-                    midpt[0], midpt[1],
-                    '{0}'.format(round(jxns[jxn], 2)),
-                    fontsize=junction_number_font_size,
-                    ha='center', va='center',
-                    backgroundcolor='w'
-                )
-
+                t = ax.text( (ss1+ss2)/2, jxns[jxn] * 1.1, 
+                            '{0}'.format(round(jxns[jxn], 2)),
+                            fontsize=junction_number_font_size, ha='center', va='center')
+                            #, backgroundcolor='w' ) AD - white here overrides transparency below
                 # @2018.12.19 transparent background
                 t.set_bbox(dict(alpha=0))
                 jxn_numbers.append(t)
 
-        try:
-            adjust_text(jxn_numbers, force_text=(0.2, 0.2), arrowprops=dict(arrowstyle="-", color='black', lw=1))
-        except IndexError as err:
-            logger.debug(err)
+        # AD - this adds  a dot next to the counts
+        #try:
+        #    adjust_text(jxn_numbers, force_text=(0.2, 0.2), arrowprops=dict(arrowstyle="-", color='black', lw=1))
+        #except IndexError as err:
+        #    logger.debug(err)
 
     if obj and obj.title:
         ax.text(max(graph_coords) - len(obj.title), max_used_y_val, obj.title, color=color, fontsize=font_size)
@@ -849,13 +910,13 @@ def plot_density(
     set_y_ticks(
         ax, label=y_label, theme=theme,
         graph_coords=graph_coords,
-        max_used_y_val=max_used_y_val * 1.1,  # keep a buffer at top and bottom of junctions
-        min_used_y_val=min_used_y_val * 1.1,
+        max_used_y_val=max_used_y_val, # * 1.1,  # keep a buffer at top and bottom of junctions
+        min_used_y_val=min_used_y_val, # * 1.1, # AD
         n_y_ticks=n_y_ticks,
         distance_between_label_axis=distance_between_label_axis,
         font_size=font_size,
         show_y_label=show_y_label,
-        y_axis_skip_zero=False if not isinstance(data, dict) and data.strand_aware else True
+        y_axis_skip_zero=False #if not isinstance(data, dict) and data.strand_aware else True
     )
 
 

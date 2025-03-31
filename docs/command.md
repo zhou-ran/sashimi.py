@@ -661,7 +661,63 @@ trackplot \
 
 ![](imgs/cmd/intron_scale.png)
 
-### 7. Visualize coverage by cpm or rpkm
+
+### 7. Fixed intron size
+
+
+There are two BAM files. Here is the output with introns fixed at 250 nt, exons unharmed (1:1), without any filtering of low-count junctions:
+
+![](imgs/cmd/PTBP3_mod_specific_transcipts.png)
+
+With --log 10, we can see all the low-count junctions:
+
+![](imgs/cmd/PTBP3_mod_specific_transcipts_log10_edit.png)
+
+If we use Trackplot's scaling features, we can get reasonably close (exons=20, introns=0.10):
+
+![](imgs/cmd/PTBP3_mod_specific_transcipts_introns_and_exons_scaled.png)
+
+Here is the equivalent plot with Trackplot (note the gaps remaining from excluded transcripts):
+
+![](imgs/cmd/PTBP3_trackplot_specific_trans_all_junctions.exons.20.introns.0.10.png)
+
+With --density-by-strand:
+
+![](imgs/cmd/PTBP3_trackplot_all_junctions_specific_transcripts_by_strand_edit.png)
+
+
+To be clear, the modifications described here were a small step following a giant leap forward. For instance, here is how the data looks in IGV:
+
+![](imgs/cmd/ptbp3_igv_2.png)
+
+
+The switch to positive-only Y values is hard-coded, along with other preferences (transparency etc.).
+
+To replicate the figures above, use:
+
+```bash
+trackplot \
+  --intron-scale 250  \   # To assigned a fixed length to introns, use an intron scale greater than 1
+  -e 9:112225716-112333664 \
+  -r ptbp3_ext.gtf.gz \
+  --show-junction-num \
+  --density bam_files.tsv \
+  --raster \
+  --height 2 \
+  --width 20 \
+  --font-size 14 \
+  --transcripts-to-show PTBP3-201,PTBP3-202,PTBP3-203,PTBP3-204,PTBP3-205,PTBP3-206,PTBP3-207,PTBP3-208 \
+  -o PTBP3_mod_specific_transcipts.log10.png
+```
+
+To scale using exising Trackplot features, use:
+
+```bash
+  --exon-scale 20 \
+  --intron-scale 0.10  \
+```
+
+### 8. Visualize coverage by cpm or rpkm
 
 We also support to visualize the coverage by normalized values.
 
@@ -1120,3 +1176,5 @@ trackplot \
 ```
 
 ![](imgs/cmd/additional.png)
+
+

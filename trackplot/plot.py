@@ -1437,7 +1437,7 @@ class Plot(object):
 
         if output:
             logger.info(f"saving fig into {output}")
-            fig.savefig(output, transparent=True, bbox_inches='tight')
+            fig.savefig(output, transparent=False, bbox_inches='tight') # AD
         elif return_image:
             output = io.BytesIO()
             if return_image == "png":
