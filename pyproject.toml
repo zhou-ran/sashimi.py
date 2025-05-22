@@ -13,7 +13,7 @@ include = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.10,<3.13"
+python = ">=3.10,<3.14"
 adjusttext = "^0.7.3"
 cairocffi = "^1.4.0"
 click = "^8.1.3"
